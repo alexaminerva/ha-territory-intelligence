@@ -517,13 +517,13 @@ function renderResults() {
         <div class="card-bar cb-blue"></div>
         <div class="card-lbl">Market Bookings</div>
         <div class="card-val">${$n(mBk)}</div>
-        <div class="card-sub">Excl. ${companyName}</div>
+        <div class="card-sub">Competitors in their zips · ${stateLabel}</div>
       </div>
       <div class="card">
         <div class="card-bar cb-blue"></div>
         <div class="card-lbl">Market Revenue</div>
         <div class="card-val">${$f(mRev)}</div>
-        <div class="card-sub">Other HA providers · ${stateLabel}</div>
+        <div class="card-sub">What ${companyName} could capture</div>
       </div>
       <div class="card">
         <div class="card-bar cb-green"></div>
@@ -545,7 +545,7 @@ function renderResults() {
       <div class="panel">
         <div class="ph">
           <div class="pt">Market Opportunity — excl. ${companyName}</div>
-          <div class="ps">All HA bookings & revenue in ${companyName}'s zips from other providers. This is what ${companyName} is missing out on.</div>
+          <div class="ps">HA bookings & revenue from other providers in ${companyName}'s zip codes. This is business ${companyName} could be capturing if they signed with us.</div>
         </div>
         <div class="pb">${marketTable(mRows)}</div>
       </div>
@@ -599,7 +599,7 @@ function signedStatesSummary(allSigned) {
 }
 
 function marketTable(rows) {
-  if (!rows.length) return `<div class="emp"><div class="ei">📍</div><strong>No market activity found</strong><p>No other HA providers found in these zips for this date range.</p></div>`;
+  if (!rows.length) return `<div class="emp"><div class="ei">📍</div><strong>No market activity found</strong><p>No other HA providers have booked jobs in these zip codes during this period.</p></div>`;
   return `<table><thead><tr><th>ZIP</th><th>City</th><th>State</th><th class="r">Bookings</th><th class="r">Revenue</th></tr></thead><tbody>
     ${rows.map(r => {
       const z = String(r.zip).padStart(5,'0');

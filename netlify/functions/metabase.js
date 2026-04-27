@@ -131,7 +131,7 @@ export default async function handler(req, context) {
 
     const zipSQL = zipSet.map((z) => `'${z}'`).join(",");
 
-    // ── Market query ──────────────────────────────────────────────────────────
+    // ── Market query — HA activity in these zips, excl. this company ─────────
     const marketRows = await sql(`
       SELECT z.code AS zip, z.city,
              COUNT(b.id) AS bookings,
