@@ -33,6 +33,18 @@ export default async function handler(req, context) {
     const body = await req.json();
     const { mode, companyName, zips, dateFrom, dateTo } = body;
 
+    // ── Schema probe — discover category-like columns ────────────────────────
+    if (mode === "schema") {
+      const rows = await sql(`
+        SELECT table_name, column_name, data_type
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name IN ('bookings','providers','zips','categories','verticals','trades')
+        ORDER BY table_name, ordinal_position
+      `);
+      return Response.json(rows);
+    }
+
     // ── All providers list (for dropdown) ───────────────────────────────────
     if (mode === "allProviders") {
       const rows = await sql(`
