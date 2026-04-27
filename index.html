@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Territory Intelligence — HouseAccount</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#eef2f7;color:#1e293b;font-size:13px;min-height:100vh}
+
+/* ── HEADER ── */
+.hdr{background:#0d1b3e;color:#fff;padding:16px 24px 14px}
+.hdr-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap}
+.hdr-title{font-size:20px;font-weight:800;letter-spacing:-.3px}
+.hdr-sub{font-size:11px;color:#7c8fb0;margin-top:2px}
+
+/* MODE TOGGLE */
+.mode-toggle{display:flex;background:#162a52;border-radius:8px;padding:3px;gap:2px}
+.mbt{padding:6px 16px;border-radius:6px;border:none;background:transparent;color:#7c8fb0;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.mbt.on{background:#2563eb;color:#fff}
+.mbt:hover:not(.on){color:#c0cde0}
+
+/* CONTROLS */
+.controls{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end}
+.cf{display:flex;flex-direction:column;gap:5px}
+.cf label{font-size:10px;font-weight:700;color:#7c8fb0;text-transform:uppercase;letter-spacing:.5px}
+input[type=text],textarea{background:#162a52;border:1.5px solid #2a4070;border-radius:7px;color:#e2e8f0;padding:8px 11px;font-size:13px;outline:none}
+input[type=text]:focus,textarea:focus{border-color:#2563eb}
+input[type=text]{width:280px}
+textarea{width:380px;height:80px;resize:vertical;font-family:monospace;font-size:12px}
+.dr-btns{display:flex;gap:3px}
+.drb{padding:6px 13px;border-radius:6px;border:1.5px solid #2a4070;background:transparent;color:#7c8fb0;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s}
+.drb.on{background:#2563eb;border-color:#2563eb;color:#fff}
+.drb:hover:not(.on){border-color:#3d5fa0;color:#c0cde0}
+input[type=date]{background:#162a52;border:1.5px solid #2a4070;border-radius:6px;color:#c0cde0;padding:7px 9px;font-size:12px;outline:none;cursor:pointer}
+input[type=date]:focus{border-color:#2563eb}
+.date-row{display:flex;align-items:center;gap:6px}
+.date-sep{color:#2a4070}
+.go-btn{padding:9px 26px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s;white-space:nowrap;align-self:flex-end}
+.go-btn:hover{background:#1d4ed8}
+.go-btn:disabled{background:#374151;color:#6b7280;cursor:not-allowed}
+.zip-hint{font-size:10px;color:#4a6080;margin-top:3px}
+
+/* STATE TABS */
+.statetabs{background:#0d1b3e;display:flex;padding:8px 24px 0;gap:3px;border-bottom:2px solid #152340;overflow-x:auto;min-height:40px}
+.stab{padding:6px 18px;border-radius:6px 6px 0 0;cursor:pointer;font-size:12px;font-weight:700;color:#4a6080;border:1.5px solid transparent;border-bottom:none;transition:all .15s;white-space:nowrap}
+.stab.on{background:#eef2f7;border-color:#1e3a6e;color:#0d1b3e}
+.stab:hover:not(.on){color:#7c8fb0}
+
+/* CONTENT */
+.content{padding:14px 24px 24px}
+
+/* LOADING / ERROR */
+.state-msg{display:flex;align-items:center;justify-content:center;gap:12px;padding:60px 24px;color:#64748b;font-size:14px;flex-direction:column}
+.spinner{width:22px;height:22px;border:2px solid #e2e8f0;border-top-color:#2563eb;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.err-box{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:14px 18px;color:#dc2626;font-size:12px;margin-bottom:14px}
+.info-box{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 16px;color:#1e40af;font-size:12px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+
+/* CARDS */
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.card{background:#fff;border-radius:10px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.card-bar{height:3px;width:28px;border-radius:2px;margin-bottom:9px}
+.cb-blue{background:#2563eb}.cb-green{background:#16a34a}
+.card-lbl{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;line-height:1.3}
+.card-val{font-size:22px;font-weight:800;color:#0f172a;line-height:1}
+.card-sub{font-size:10px;color:#94a3b8;margin-top:4px;line-height:1.3}
+
+/* PANELS */
+.panels{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.panel{background:#fff;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.08);display:flex;flex-direction:column;overflow:hidden}
+.ph{padding:13px 16px 10px;border-bottom:1px solid #f1f5f9}
+.pt{font-size:13px;font-weight:700;color:#0f172a}
+.ps{font-size:11px;color:#64748b;margin-top:3px;line-height:1.4}
+.pb{overflow-y:auto;max-height:440px}
+
+/* TABLE */
+table{width:100%;border-collapse:collapse}
+thead th{position:sticky;top:0;z-index:1;background:#f8fafc;padding:6px 12px;text-align:left;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid #e2e8f0;white-space:nowrap}
+th.r,td.r{text-align:right}
+tbody tr{border-bottom:1px solid #f1f5f9}
+tbody tr:hover{background:#f8fafc}
+td{padding:5px 12px;font-size:12px;color:#334155}
+.zc{font-family:monospace;font-weight:700;color:#0f172a;font-size:11px}
+.cy{color:#64748b;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pv{color:#334155;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
+.rv{color:#16a34a;font-weight:700;font-family:monospace;font-size:11px}
+.bk{font-family:monospace;font-size:11px}
+
+/* EMPTY */
+.emp{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:36px 20px;gap:6px;text-align:center}
+.emp .ei{font-size:28px}
+.emp strong{font-size:12px;color:#64748b}
+.emp p{font-size:11px;color:#94a3b8;line-height:1.5;max-width:220px;margin-top:2px}
+
+@media(max-width:800px){
+  .cards{grid-template-columns:1fr 1fr}
+  .panels{grid-template-columns:1fr}
+  textarea{width:100%}
+  input[type=text]{width:100%}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="hdr-top">
+    <div>
+      <div class="hdr-title">Territory Intelligence</div>
+      <div class="hdr-sub" id="hdr-sub">HouseAccount · Live from Metabase</div>
+    </div>
+    <div class="mode-toggle">
+      <button class="mbt on" id="mbt-zips" onclick="setMode('zips')">📍 By Zip Codes</button>
+      <button class="mbt" id="mbt-provider" onclick="setMode('provider')">🔍 By Provider Name</button>
+    </div>
+  </div>
+
+  <div class="controls" id="controls">
+    <!-- Company name — always shown -->
+    <div class="cf">
+      <label id="name-label">Provider / Company Name</label>
+      <input type="text" id="company-name" placeholder="e.g. Handyman Connection, Ace Handyman…"/>
+    </div>
+
+    <!-- Zip textarea — mode=zips only -->
+    <div class="cf" id="zip-field">
+      <label>Paste Zip Codes (any format)</label>
+      <textarea id="zip-input" placeholder="07024, 07026 07070&#10;32806 33019, 32803…"></textarea>
+      <span class="zip-hint" id="zip-hint">Paste zips — states auto-detected</span>
+    </div>
+
+    <!-- Date range -->
+    <div class="cf">
+      <label>Date Range</label>
+      <div class="dr-btns">
+        <button class="drb" onclick="setPeriod(3)">3M</button>
+        <button class="drb" onclick="setPeriod(6)">6M</button>
+        <button class="drb on" id="drb-12" onclick="setPeriod(12)">12M</button>
+        <button class="drb" onclick="setPeriod(24)">24M</button>
+      </div>
+      <div class="date-row" style="margin-top:5px">
+        <input type="date" id="d-from"/>
+        <span class="date-sep">→</span>
+        <input type="date" id="d-to"/>
+      </div>
+    </div>
+
+    <button class="go-btn" id="go-btn" onclick="runQuery()">Analyze →</button>
+  </div>
+</div>
+
+<!-- STATE TABS -->
+<div class="statetabs" id="statetabs"></div>
+
+<!-- CONTENT -->
+<div class="content" id="content">
+  <div class="state-msg">
+    <div style="font-size:32px">📊</div>
+    <div>Enter a company name and click <strong>Analyze</strong> to pull live data from Metabase.</div>
+  </div>
+</div>
+
+<script>
+// ── STATE ─────────────────────────────────────────────────────────────────────
+const S = {
+  mode: 'zips',
+  state: null,
+  results: null,   // { market, signed, zips, companyName }
+  stateMap: {},    // zip → state
+};
+
+const STATE_LABELS = {
+  FL:'🌴 FL', TX:'⭐ TX', NJ:'🏙 NJ', CA:'☀️ CA', NY:'🗽 NY',
+  GA:'🍑 GA', NC:'🌲 NC', VA:'🏛 VA', PA:'🔔 PA', OH:'🌽 OH',
+  IL:'🌆 IL', WA:'🌧 WA', CO:'⛰ CO', AZ:'🌵 AZ', TN:'🎵 TN',
+  SC:'🌴 SC', MD:'🦀 MD', MN:'🌊 MN', MO:'🎺 MO', WI:'🧀 WI',
+  MA:'🦞 MA', CT:'⛵ CT', RI:'🏛 RI', NH:'🍂 NH', VT:'🍁 VT',
+  ME:'🦞 ME', MI:'🚗 MI', IN:'🏎 IN', KY:'🐴 KY', TN:'🎵 TN',
+  AL:'🌹 AL', MS:'🎷 MS', LA:'🎶 LA', AR:'💎 AR', OK:'🌾 OK',
+  KS:'🌾 KS', NE:'🌽 NE', SD:'🏔 SD', ND:'🌾 ND', MT:'⛰ MT',
+  WY:'🦬 WY', ID:'🥔 ID', NV:'🎰 NV', UT:'🏜 UT', OR:'🌲 OR',
+  NM:'🌶 NM', HI:'🌺 HI', AK:'🐻 AK',
+};
+
+// ── ZIP → STATE ───────────────────────────────────────────────────────────────
+function zipToState(z) {
+  const n = parseInt(z, 10);
+  if(n>=7001&&n<=8999)   return 'NJ';
+  if(n>=32004&&n<=34997) return 'FL';
+  if(n>=73301&&n<=79999) return 'TX';
+  if(n>=90001&&n<=96162) return 'CA';
+  if(n>=10001&&n<=14975) return 'NY';
+  if(n>=30001&&n<=31999) return 'GA';
+  if(n>=27006&&n<=28909) return 'NC';
+  if(n>=20101&&n<=24658) return 'VA';
+  if(n>=15001&&n<=19640) return 'PA';
+  if(n>=43001&&n<=45999) return 'OH';
+  if(n>=60001&&n<=62999) return 'IL';
+  if(n>=98001&&n<=99403) return 'WA';
+  if(n>=80001&&n<=81658) return 'CO';
+  if(n>=85001&&n<=86556) return 'AZ';
+  if(n>=37010&&n<=38589) return 'TN';
+  if(n>=29001&&n<=29948) return 'SC';
+  if(n>=20601&&n<=21930) return 'MD';
+  if(n>=55001&&n<=56763) return 'MN';
+  if(n>=63001&&n<=65899) return 'MO';
+  if(n>=53001&&n<=54990) return 'WI';
+  if(n>=1001&&n<=2791)   return 'MA';
+  if(n>=6001&&n<=6999)   return 'CT';
+  if(n>=2801&&n<=2940)   return 'RI';
+  if(n>=3031&&n<=3897)   return 'NH';
+  if(n>=5001&&n<=5999)   return 'VT';
+  if(n>=3901&&n<=4992)   return 'ME';
+  if(n>=48001&&n<=49971) return 'MI';
+  if(n>=46001&&n<=47997) return 'IN';
+  if(n>=40003&&n<=42788) return 'KY';
+  if(n>=35004&&n<=36925) return 'AL';
+  if(n>=38601&&n<=39776) return 'MS';
+  if(n>=70001&&n<=71497) return 'LA';
+  if(n>=71601&&n<=72959) return 'AR';
+  if(n>=73001&&n<=73199) return 'OK';
+  if(n>=66002&&n<=67954) return 'KS';
+  if(n>=68001&&n<=69367) return 'NE';
+  if(n>=57001&&n<=57799) return 'SD';
+  if(n>=58001&&n<=58856) return 'ND';
+  if(n>=59001&&n<=59937) return 'MT';
+  if(n>=82001&&n<=83128) return 'WY';
+  if(n>=83201&&n<=83876) return 'ID';
+  if(n>=88901&&n<=89883) return 'NV';
+  if(n>=84001&&n<=84784) return 'UT';
+  if(n>=97001&&n<=97920) return 'OR';
+  if(n>=87001&&n<=88441) return 'NM';
+  if(n>=96701&&n<=96898) return 'HI';
+  if(n>=99501&&n<=99950) return 'AK';
+  if(n>=20001&&n<=20599) return 'DC';
+  return null;
+}
+
+// ── UTILS ─────────────────────────────────────────────────────────────────────
+function $f(n) { return '$' + Math.round(n).toLocaleString(); }
+function $n(n) { return (+n).toLocaleString(); }
+
+function setPeriod(m) {
+  document.querySelectorAll('.drb').forEach(b => b.classList.remove('on'));
+  document.querySelectorAll('.drb').forEach(b => { if(b.textContent === m+'M') b.classList.add('on'); });
+  const days = m===3?90:m===6?180:m===12?365:730;
+  const t = new Date(), f = new Date();
+  f.setDate(f.getDate() - days);
+  document.getElementById('d-from').value = f.toISOString().slice(0,10);
+  document.getElementById('d-to').value   = t.toISOString().slice(0,10);
+}
+
+function setMode(mode) {
+  S.mode = mode;
+  document.getElementById('mbt-zips').classList.toggle('on', mode==='zips');
+  document.getElementById('mbt-provider').classList.toggle('on', mode==='provider');
+  document.getElementById('zip-field').style.display = mode==='zips' ? '' : 'none';
+  document.getElementById('name-label').textContent =
+    mode === 'zips' ? 'Provider / Company Name' : 'Parent Company Name';
+  document.getElementById('company-name').placeholder =
+    mode === 'zips' ? 'e.g. Handyman Connection — Dallas' : 'e.g. Handyman Connection';
+}
+
+// ── QUERY ─────────────────────────────────────────────────────────────────────
+async function runQuery() {
+  const companyName = document.getElementById('company-name').value.trim();
+  const dateFrom    = document.getElementById('d-from').value;
+  const dateTo      = document.getElementById('d-to').value;
+
+  if (!companyName) { alert('Please enter a company or provider name.'); return; }
+  if (!dateFrom || !dateTo) { alert('Please select a date range.'); return; }
+
+  let zips = [];
+  if (S.mode === 'zips') {
+    const raw = document.getElementById('zip-input').value;
+    zips = (raw.match(/\d{4,5}/g) || []).map(z => z.padStart(5,'0'));
+    if (zips.length === 0) { alert('Please paste at least one zip code.'); return; }
+  }
+
+  // Show loading
+  document.getElementById('go-btn').disabled = true;
+  document.getElementById('go-btn').textContent = 'Loading…';
+  document.getElementById('statetabs').innerHTML = '';
+  document.getElementById('content').innerHTML = `
+    <div class="state-msg"><div class="spinner"></div>Querying Metabase…</div>`;
+
+  try {
+    const resp = await fetch('/api/metabase', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: S.mode, companyName, zips, dateFrom, dateTo }),
+    });
+
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+
+    // Build zip→state map
+    S.stateMap = {};
+    (data.zips || []).forEach(z => {
+      const st = zipToState(z);
+      if (st) S.stateMap[z] = st;
+    });
+
+    S.results = { ...data, companyName, dateFrom, dateTo };
+
+    // Determine available states
+    const states = [...new Set(Object.values(S.stateMap))].sort();
+    S.state = states[0] || null;
+
+    buildTabs(states);
+    renderResults();
+
+  } catch (err) {
+    document.getElementById('content').innerHTML = `
+      <div class="err-box">⚠️ <strong>Error:</strong> ${err.message}</div>`;
+  } finally {
+    document.getElementById('go-btn').disabled = false;
+    document.getElementById('go-btn').textContent = 'Analyze →';
+  }
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+function buildTabs(states) {
+  const el = document.getElementById('statetabs');
+  if (!states.length) { el.innerHTML = ''; return; }
+  el.innerHTML = states.map(st => `
+    <div class="stab${st===S.state?' on':''}" id="t${st}" onclick="setTab('${st}')">
+      ${STATE_LABELS[st]||st}
+    </div>`).join('') + `
+    <div class="stab${S.state==='ALL'?' on':''}" id="tALL" onclick="setTab('ALL')">🌎 All States</div>`;
+}
+
+function setTab(st) {
+  S.state = st;
+  document.querySelectorAll('.stab').forEach(el => el.classList.remove('on'));
+  const el = document.getElementById('t'+st);
+  if (el) el.classList.add('on');
+  renderResults();
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function renderResults() {
+  if (!S.results) return;
+  const { market, signed, companyName, dateFrom, dateTo } = S.results;
+
+  // Filter by state
+  function filterState(rows) {
+    if (S.state === 'ALL') return rows;
+    return rows.filter(r => S.stateMap[String(r.zip).padStart(5,'0')] === S.state);
+  }
+
+  const mRows = filterState(market).sort((a,b) => b.revenue - a.revenue);
+  const sRows = filterState(signed).sort((a,b) => b.revenue - a.revenue);
+
+  const mRev = mRows.reduce((a,r) => a + (+r.revenue||0), 0);
+  const mBk  = mRows.reduce((a,r) => a + (+r.bookings||0), 0);
+  const sRev = sRows.reduce((a,r) => a + (+r.revenue||0), 0);
+  const sBk  = sRows.reduce((a,r) => a + (+r.bookings||0), 0);
+  const stateLabel = S.state === 'ALL' ? 'All States' : (STATE_LABELS[S.state]||S.state);
+
+  document.getElementById('hdr-sub').textContent =
+    `${companyName} · ${dateFrom} → ${dateTo} · ${stateLabel}`;
+
+  document.getElementById('content').innerHTML = `
+    <div class="cards">
+      <div class="card">
+        <div class="card-bar cb-blue"></div>
+        <div class="card-lbl">Market Bookings</div>
+        <div class="card-val">${$n(mBk)}</div>
+        <div class="card-sub">Excl. ${companyName}</div>
+      </div>
+      <div class="card">
+        <div class="card-bar cb-blue"></div>
+        <div class="card-lbl">Market Revenue</div>
+        <div class="card-val">${$f(mRev)}</div>
+        <div class="card-sub">Other HA providers · ${stateLabel}</div>
+      </div>
+      <div class="card">
+        <div class="card-bar cb-green"></div>
+        <div class="card-lbl">Signed Bookings</div>
+        <div class="card-val">${$n(sBk)}</div>
+        <div class="card-sub">${companyName} on HA</div>
+      </div>
+      <div class="card">
+        <div class="card-bar cb-green"></div>
+        <div class="card-lbl">Signed Revenue</div>
+        <div class="card-val">${$f(sRev)}</div>
+        <div class="card-sub">Driven for ${companyName}</div>
+      </div>
+    </div>
+
+    <div class="panels">
+      <div class="panel">
+        <div class="ph">
+          <div class="pt">Market Opportunity — excl. ${companyName}</div>
+          <div class="ps">All HA bookings & revenue in ${companyName}'s zips from other providers. This is what ${companyName} is missing out on.</div>
+        </div>
+        <div class="pb">${marketTable(mRows)}</div>
+      </div>
+      <div class="panel">
+        <div class="ph">
+          <div class="pt">Signed ${companyName} Locations</div>
+          <div class="ps">${companyName} providers already on HouseAccount — bookings & revenue we've driven for them.</div>
+        </div>
+        <div class="pb">${signedTable(sRows)}</div>
+      </div>
+    </div>`;
+}
+
+function marketTable(rows) {
+  if (!rows.length) return `<div class="emp"><div class="ei">📍</div><strong>No market activity found</strong><p>No other HA providers found in these zips for this date range.</p></div>`;
+  return `<table><thead><tr><th>ZIP</th><th>City</th><th>State</th><th class="r">Bookings</th><th class="r">Revenue</th></tr></thead><tbody>
+    ${rows.map(r => {
+      const z = String(r.zip).padStart(5,'0');
+      const st = S.stateMap[z]||'';
+      return `<tr><td class="zc">${z}</td><td class="cy">${r.city||'—'}</td><td style="color:#94a3b8;font-size:11px">${st}</td><td class="r bk">${$n(r.bookings)}</td><td class="r rv">${$f(r.revenue)}</td></tr>`;
+    }).join('')}
+  </tbody></table>`;
+}
+
+function signedTable(rows) {
+  if (!rows.length) return `<div class="emp"><div class="ei">🤝</div><strong>No signed locations found</strong><p>No providers matching "${S.results?.companyName}" found on HouseAccount in these zips.</p></div>`;
+  return `<table><thead><tr><th>ZIP</th><th>City</th><th>Provider</th><th class="r">Bookings</th><th class="r">Revenue</th></tr></thead><tbody>
+    ${rows.map(r => {
+      const z = String(r.zip).padStart(5,'0');
+      return `<tr><td class="zc">${z}</td><td class="cy">${r.city||'—'}</td><td class="pv" title="${r.provider||''}">${r.provider||'—'}</td><td class="r bk">${$n(r.bookings)}</td><td class="r rv">${$f(r.revenue)}</td></tr>`;
+    }).join('')}
+  </tbody></table>`;
+}
+
+// ── ZIP HINT ──────────────────────────────────────────────────────────────────
+document.getElementById('zip-input').addEventListener('input', function() {
+  const zips = (this.value.match(/\d{4,5}/g)||[]).map(z=>z.padStart(5,'0'));
+  const byState = {};
+  zips.forEach(z => { const st=zipToState(z); if(st)(byState[st]=byState[st]||[]).push(z); });
+  const parts = Object.entries(byState).sort().map(([st,zs])=>`${st}: ${zs.length}`);
+  document.getElementById('zip-hint').textContent =
+    parts.length ? parts.join(' · ') : 'Paste zips — states auto-detected';
+});
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+setPeriod(12);
+setMode('zips');
+</script>
+</body>
+</html>
