@@ -103,6 +103,18 @@ td{padding:5px 12px;font-size:12px;color:#334155}
 .emp strong{font-size:12px;color:#64748b}
 .emp p{font-size:11px;color:#94a3b8;line-height:1.5;max-width:220px;margin-top:2px}
 
+/* STATE SUMMARY STRIP */
+.state-summary{background:#fff;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.08);padding:14px 16px;margin-bottom:12px}
+.ss-title{font-size:12px;font-weight:700;color:#0f172a;margin-bottom:10px}
+.ss-grid{display:flex;flex-wrap:wrap;gap:8px}
+.ss-chip{display:flex;align-items:center;gap:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:7px 12px;min-width:160px;cursor:pointer;transition:background .12s}
+.ss-chip:hover{background:#dcfce7}
+.ss-chip .sc-flag{font-size:16px}
+.ss-chip .sc-info{display:flex;flex-direction:column;gap:1px}
+.ss-chip .sc-state{font-size:11px;font-weight:700;color:#15803d}
+.ss-chip .sc-nums{font-size:10px;color:#64748b}
+.ss-none{font-size:12px;color:#94a3b8;font-style:italic;padding:8px 0}
+
 @media(max-width:800px){
   .cards{grid-template-columns:1fr 1fr}
   .panels{grid-template-columns:1fr}
@@ -452,6 +464,8 @@ function renderResults() {
   document.getElementById('hdr-sub').textContent =
     `${companyName} · ${dateFrom} → ${dateTo} · ${stateLabel}`;
 
+  const allStateSummary = S.state === 'ALL' ? signedStatesSummary(signed) : '';
+
   document.getElementById('content').innerHTML = `
     <div class="cards">
       <div class="card">
@@ -480,6 +494,8 @@ function renderResults() {
       </div>
     </div>
 
+    ${allStateSummary}
+
     <div class="panels">
       <div class="panel">
         <div class="ph">
@@ -496,6 +512,45 @@ function renderResults() {
         <div class="pb">${signedTable(sRows)}</div>
       </div>
     </div>`;
+}
+
+function signedStatesSummary(allSigned) {
+  // Group signed rows by state
+  const byState = {};
+  allSigned.forEach(r => {
+    const z = String(r.zip).padStart(5,'0');
+    const st = S.stateMap[z];
+    if (!st) return;
+    if (!byState[st]) byState[st] = { bookings: 0, revenue: 0, providers: new Set() };
+    byState[st].bookings += (+r.bookings||0);
+    byState[st].revenue  += (+r.revenue||0);
+    if (r.provider) byState[st].providers.add(r.provider);
+  });
+
+  const states = Object.entries(byState).sort((a,b) => b[1].revenue - a[1].revenue);
+  if (!states.length) {
+    return `<div class="state-summary">
+      <div class="ss-title">🤝 Signed Providers by State</div>
+      <div class="ss-none">No signed providers found in any state for this date range.</div>
+    </div>`;
+  }
+
+  const chips = states.map(([st, d]) => {
+    const label = STATE_LABELS[st] || st;
+    const provCount = d.providers.size;
+    return `<div class="ss-chip" onclick="setTab('${st}')" title="Click to drill into ${st}">
+      <span class="sc-flag">${label.split(' ')[0]}</span>
+      <span class="sc-info">
+        <span class="sc-state">${st} — ${$f(d.revenue)}</span>
+        <span class="sc-nums">${$n(d.bookings)} bookings · ${provCount} provider${provCount!==1?'s':''}</span>
+      </span>
+    </div>`;
+  }).join('');
+
+  return `<div class="state-summary">
+    <div class="ss-title">🤝 Signed Providers by State — click any state to drill in</div>
+    <div class="ss-grid">${chips}</div>
+  </div>`;
 }
 
 function marketTable(rows) {
