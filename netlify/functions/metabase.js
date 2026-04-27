@@ -31,9 +31,9 @@ export default async function handler(req, context) {
 
   try {
     const body = await req.json();
-    const { mode, companyName, zips, dateFrom, dateTo } = body;
+    const { mode, companyName, zips, dateFrom, dateTo, vertical } = body;
 
-    // ── Schema probe — discover category-like columns ────────────────────────
+    // ── Schema probe ─────────────────────────────────────────────────────────
     if (mode === "schema") {
       const rows = await sql(`
         SELECT table_name, column_name, data_type
@@ -45,7 +45,18 @@ export default async function handler(req, context) {
       return Response.json(rows);
     }
 
-    // ── All providers list (for dropdown) ───────────────────────────────────
+    // ── Verticals list ────────────────────────────────────────────────────────
+    if (mode === "verticals") {
+      const rows = await sql(`
+        SELECT DISTINCT v.name
+        FROM verticals v
+        WHERE v.name IS NOT NULL AND v.name != ''
+        ORDER BY v.name
+      `);
+      return Response.json(rows.map((r) => r.name));
+    }
+
+    // ── All providers list ────────────────────────────────────────────────────
     if (mode === "allProviders") {
       const rows = await sql(`
         SELECT DISTINCT name FROM providers
@@ -56,7 +67,7 @@ export default async function handler(req, context) {
       return Response.json(rows.map((r) => r.name));
     }
 
-    // ── Provider search autocomplete ─────────────────────────────────────────
+    // ── Provider search autocomplete ──────────────────────────────────────────
     if (mode === "search") {
       const term = sanitizeName((body.term || "").trim());
       if (term.length < 2) return Response.json([]);
@@ -77,18 +88,26 @@ export default async function handler(req, context) {
     }
 
     const fn = sanitizeName(companyName.trim());
+    const vn = vertical ? sanitizeName(vertical.trim()) : null;
 
-    // ── Determine zip set ────────────────────────────────────────────────────
+    // Optional vertical filter — limits to providers who have this trade
+    const verticalFilter = vn
+      ? `AND b.provider_id IN (
+           SELECT t.provider_id FROM trades t
+           JOIN verticals v ON v.id = t.vertical_id
+           WHERE LOWER(v.name) = LOWER('${vn}')
+         )`
+      : "";
+
+    // ── Determine zip set ─────────────────────────────────────────────────────
     let zipSet = [];
 
     if (mode === "zips") {
-      // User provided the zips
       zipSet = (zips || []).map((z) => String(z).padStart(5, "0")).filter((z) => /^\d{5}$/.test(z));
       if (zipSet.length === 0) {
         return Response.json({ error: "No valid 5-digit zip codes found" }, { status: 400 });
       }
     } else {
-      // mode === "provider" — discover zips from DB where this company has been active
       const zipRows = await sql(`
         SELECT DISTINCT z.code AS zip
         FROM bookings b
@@ -96,6 +115,7 @@ export default async function handler(req, context) {
         JOIN zips z ON z.id = b.zip_id
         WHERE LOWER(p.name) LIKE LOWER('%${fn}%')
           AND b.created_at BETWEEN '${dateFrom}' AND '${dateTo}'
+          ${verticalFilter}
         ORDER BY z.code
         LIMIT 1000
       `);
@@ -104,15 +124,14 @@ export default async function handler(req, context) {
       if (zipSet.length === 0) {
         return Response.json({
           market: [], signed: [], zips: [],
-          message: `No bookings found for providers matching "${companyName}" in this date range.`,
+          message: `No bookings found for providers matching "${companyName}"${vn ? ` in vertical "${vn}"` : ""} in this date range.`,
         });
       }
     }
 
     const zipSQL = zipSet.map((z) => `'${z}'`).join(",");
 
-    // ── Market query ─────────────────────────────────────────────────────────
-    // All HA activity in these zips, EXCLUDING this company's own providers
+    // ── Market query ──────────────────────────────────────────────────────────
     const marketRows = await sql(`
       SELECT z.code AS zip, z.city,
              COUNT(b.id) AS bookings,
@@ -124,12 +143,12 @@ export default async function handler(req, context) {
         AND b.provider_id NOT IN (
           SELECT id FROM providers WHERE LOWER(name) LIKE LOWER('%${fn}%')
         )
+        ${verticalFilter}
       GROUP BY z.code, z.city
       ORDER BY revenue DESC
     `);
 
-    // ── Signed query ─────────────────────────────────────────────────────────
-    // Activity driven FOR this company's providers in these zips
+    // ── Signed query ──────────────────────────────────────────────────────────
     const signedRows = await sql(`
       SELECT p.name AS provider, z.code AS zip, z.city,
              COUNT(b.id) AS bookings,
@@ -140,6 +159,7 @@ export default async function handler(req, context) {
       WHERE z.code IN (${zipSQL})
         AND b.created_at BETWEEN '${dateFrom}' AND '${dateTo}'
         AND LOWER(p.name) LIKE LOWER('%${fn}%')
+        ${verticalFilter}
       GROUP BY p.name, z.code, z.city
       ORDER BY revenue DESC
     `);

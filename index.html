@@ -163,6 +163,14 @@ td{padding:5px 12px;font-size:12px;color:#334155}
       <span class="zip-hint" id="zip-hint">Paste zips — states auto-detected</span>
     </div>
 
+    <!-- Vertical filter -->
+    <div class="cf">
+      <label>Vertical (optional)</label>
+      <select id="vertical-filter" style="background:#162a52;border:1.5px solid #2a4070;border-radius:7px;color:#c0cde0;padding:8px 11px;font-size:13px;outline:none;width:200px;cursor:pointer">
+        <option value="">All Verticals</option>
+      </select>
+    </div>
+
     <!-- Date range -->
     <div class="cf">
       <label>Date Range</label>
@@ -303,6 +311,24 @@ function getCompanyName() {
   return document.getElementById('pd-search').value.trim();
 }
 
+async function loadVerticals() {
+  try {
+    const resp = await fetch('/api/metabase', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'verticals' }),
+    });
+    const names = await resp.json();
+    const sel = document.getElementById('vertical-filter');
+    names.forEach(n => {
+      const opt = document.createElement('option');
+      opt.value = n;
+      opt.textContent = n;
+      sel.appendChild(opt);
+    });
+  } catch { /* verticals optional, fail silently */ }
+}
+
 async function loadAllProviders() {
   const inp = document.getElementById('pd-search');
   inp.placeholder = 'Loading providers…';
@@ -357,6 +383,7 @@ function pdClose() {
 
 document.addEventListener('DOMContentLoaded', () => {
   loadAllProviders();
+  loadVerticals();
 
   const inp = document.getElementById('pd-search');
   inp.addEventListener('focus', function() { pdRender(this.value.trim()); });
@@ -409,7 +436,7 @@ async function runQuery() {
     const resp = await fetch('/api/metabase', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: S.mode, companyName, zips, dateFrom, dateTo }),
+      body: JSON.stringify({ mode: S.mode, companyName, zips, dateFrom, dateTo, vertical: document.getElementById('vertical-filter').value || null }),
     });
 
     const data = await resp.json();
