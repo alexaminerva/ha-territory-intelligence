@@ -45,6 +45,12 @@ export default async function handler(req, context) {
       return Response.json(rows);
     }
 
+    // ── Booking status values ─────────────────────────────────────────────────
+    if (mode === "statuses") {
+      const rows = await sql(`SELECT DISTINCT status FROM bookings ORDER BY status`);
+      return Response.json(rows.map(r => r.status));
+    }
+
     // ── Verticals list ────────────────────────────────────────────────────────
     if (mode === "verticals") {
       const rows = await sql(`
