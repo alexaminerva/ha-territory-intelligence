@@ -47,7 +47,7 @@ export default async function handler(req, context) {
 
     // ── Booking status values ─────────────────────────────────────────────────
     if (mode === "statuses") {
-      const rows = await sql(`SELECT DISTINCT status FROM bookings ORDER BY status`);
+      const rows = await sql(`SELECT DISTINCT status::text AS status FROM bookings WHERE status IS NOT NULL ORDER BY 1 LIMIT 50`);
       return Response.json(rows.map(r => r.status));
     }
 
@@ -141,7 +141,9 @@ export default async function handler(req, context) {
     const marketRows = await sql(`
       SELECT z.code AS zip, z.city,
              COUNT(b.id) AS bookings,
-             COALESCE(SUM((lower(b.estimate)+upper(b.estimate))/2.0), 0) AS revenue
+             COALESCE(SUM((lower(b.estimate)+upper(b.estimate))/2.0), 0) AS revenue,
+             COUNT(CASE WHEN b.status::text = 'fulfilled' THEN 1 END) AS fulfilled_bookings,
+             COALESCE(SUM(CASE WHEN b.status::text = 'fulfilled' THEN (lower(b.estimate)+upper(b.estimate))/2.0 ELSE 0 END), 0) AS fulfilled_revenue
       FROM bookings b
       JOIN zips z ON z.id = b.zip_id
       WHERE z.code IN (${zipSQL})
@@ -158,7 +160,9 @@ export default async function handler(req, context) {
     const signedRows = await sql(`
       SELECT p.name AS provider, z.code AS zip, z.city,
              COUNT(b.id) AS bookings,
-             COALESCE(SUM((lower(b.estimate)+upper(b.estimate))/2.0), 0) AS revenue
+             COALESCE(SUM((lower(b.estimate)+upper(b.estimate))/2.0), 0) AS revenue,
+             COUNT(CASE WHEN b.status::text = 'fulfilled' THEN 1 END) AS fulfilled_bookings,
+             COALESCE(SUM(CASE WHEN b.status::text = 'fulfilled' THEN (lower(b.estimate)+upper(b.estimate))/2.0 ELSE 0 END), 0) AS fulfilled_revenue
       FROM bookings b
       JOIN providers p ON p.id = b.provider_id
       JOIN zips z ON z.id = b.zip_id

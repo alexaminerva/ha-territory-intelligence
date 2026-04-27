@@ -500,10 +500,14 @@ function renderResults() {
   const mRows = filterState(market).sort((a,b) => b.revenue - a.revenue);
   const sRows = filterState(signed).sort((a,b) => b.revenue - a.revenue);
 
-  const mRev = mRows.reduce((a,r) => a + (+r.revenue||0), 0);
-  const mBk  = mRows.reduce((a,r) => a + (+r.bookings||0), 0);
-  const sRev = sRows.reduce((a,r) => a + (+r.revenue||0), 0);
-  const sBk  = sRows.reduce((a,r) => a + (+r.bookings||0), 0);
+  const mRev  = mRows.reduce((a,r) => a + (+r.revenue||0), 0);
+  const mBk   = mRows.reduce((a,r) => a + (+r.bookings||0), 0);
+  const mFRev = mRows.reduce((a,r) => a + (+r.fulfilled_revenue||0), 0);
+  const mFBk  = mRows.reduce((a,r) => a + (+r.fulfilled_bookings||0), 0);
+  const sRev  = sRows.reduce((a,r) => a + (+r.revenue||0), 0);
+  const sBk   = sRows.reduce((a,r) => a + (+r.bookings||0), 0);
+  const sFRev = sRows.reduce((a,r) => a + (+r.fulfilled_revenue||0), 0);
+  const sFBk  = sRows.reduce((a,r) => a + (+r.fulfilled_bookings||0), 0);
   const stateLabel = S.state === 'ALL' ? 'All States' : (STATE_LABELS[S.state]||S.state);
 
   document.getElementById('hdr-sub').textContent =
@@ -512,30 +516,56 @@ function renderResults() {
   const allStateSummary = S.state === 'ALL' ? signedStatesSummary(signed) : '';
 
   document.getElementById('content').innerHTML = `
-    <div class="cards">
+    <div class="cards" style="margin-bottom:6px">
       <div class="card">
         <div class="card-bar cb-blue"></div>
-        <div class="card-lbl">Market Bookings</div>
+        <div class="card-lbl">Market Jobs Booked</div>
         <div class="card-val">${$n(mBk)}</div>
         <div class="card-sub">Competitors in their zips · ${stateLabel}</div>
       </div>
       <div class="card">
         <div class="card-bar cb-blue"></div>
-        <div class="card-lbl">Market Revenue</div>
+        <div class="card-lbl">Market Revenue (Booked)</div>
         <div class="card-val">${$f(mRev)}</div>
-        <div class="card-sub">What ${companyName} could capture</div>
+        <div class="card-sub">Estimated value · excl. ${companyName}</div>
       </div>
       <div class="card">
         <div class="card-bar cb-green"></div>
-        <div class="card-lbl">Signed Bookings</div>
+        <div class="card-lbl">Signed Jobs Booked</div>
         <div class="card-val">${$n(sBk)}</div>
         <div class="card-sub">${companyName} on HA</div>
       </div>
       <div class="card">
         <div class="card-bar cb-green"></div>
-        <div class="card-lbl">Signed Revenue</div>
+        <div class="card-lbl">Signed Revenue (Booked)</div>
         <div class="card-val">${$f(sRev)}</div>
-        <div class="card-sub">Driven for ${companyName}</div>
+        <div class="card-sub">Estimated value · ${companyName}</div>
+      </div>
+    </div>
+    <div class="cards">
+      <div class="card">
+        <div class="card-bar" style="background:#1d4ed8;width:28px;height:3px;border-radius:2px;margin-bottom:9px"></div>
+        <div class="card-lbl">Market Jobs Completed</div>
+        <div class="card-val">${$n(mFBk)}</div>
+        <div class="card-sub">Fulfilled · competitors · ${stateLabel}</div>
+      </div>
+      <div class="card">
+        <div class="card-bar" style="background:#1d4ed8;width:28px;height:3px;border-radius:2px;margin-bottom:9px"></div>
+        <div class="card-lbl">Market Revenue (Completed)</div>
+        <div class="card-val">${$f(mFRev)}</div>
+        <div class="card-sub">Fulfilled value · excl. ${companyName}</div>
+      </div>
+      <div class="card">
+        <div class="card-bar" style="background:#15803d;width:28px;height:3px;border-radius:2px;margin-bottom:9px"></div>
+        <div class="card-lbl">Signed Jobs Completed</div>
+        <div class="card-val">${$n(sFBk)}</div>
+        <div class="card-sub">Fulfilled · ${companyName}</div>
+      </div>
+      <div class="card">
+        <div class="card-bar" style="background:#15803d;width:28px;height:3px;border-radius:2px;margin-bottom:9px"></div>
+        <div class="card-lbl">Signed Revenue (Completed)</div>
+        <div class="card-val">${$f(sFRev)}</div>
+        <div class="card-sub">Fulfilled value · ${companyName}</div>
       </div>
     </div>
 
@@ -600,21 +630,21 @@ function signedStatesSummary(allSigned) {
 
 function marketTable(rows) {
   if (!rows.length) return `<div class="emp"><div class="ei">📍</div><strong>No market activity found</strong><p>No other HA providers have booked jobs in these zip codes during this period.</p></div>`;
-  return `<table><thead><tr><th>ZIP</th><th>City</th><th>State</th><th class="r">Bookings</th><th class="r">Revenue</th></tr></thead><tbody>
+  return `<table><thead><tr><th>ZIP</th><th>City</th><th>State</th><th class="r">Booked</th><th class="r">Est. Value</th><th class="r">Completed</th><th class="r">Completed $</th></tr></thead><tbody>
     ${rows.map(r => {
       const z = String(r.zip).padStart(5,'0');
       const st = S.stateMap[z]||'';
-      return `<tr><td class="zc">${z}</td><td class="cy">${r.city||'—'}</td><td style="color:#94a3b8;font-size:11px">${st}</td><td class="r bk">${$n(r.bookings)}</td><td class="r rv">${$f(r.revenue)}</td></tr>`;
+      return `<tr><td class="zc">${z}</td><td class="cy">${r.city||'—'}</td><td style="color:#94a3b8;font-size:11px">${st}</td><td class="r bk">${$n(r.bookings)}</td><td class="r rv">${$f(r.revenue)}</td><td class="r bk">${$n(r.fulfilled_bookings||0)}</td><td class="r rv">${$f(r.fulfilled_revenue||0)}</td></tr>`;
     }).join('')}
   </tbody></table>`;
 }
 
 function signedTable(rows) {
   if (!rows.length) return `<div class="emp"><div class="ei">🤝</div><strong>No signed locations found</strong><p>No providers matching "${S.results?.companyName}" found on HouseAccount in these zips.</p></div>`;
-  return `<table><thead><tr><th>ZIP</th><th>City</th><th>Provider</th><th class="r">Bookings</th><th class="r">Revenue</th></tr></thead><tbody>
+  return `<table><thead><tr><th>ZIP</th><th>City</th><th>Provider</th><th class="r">Booked</th><th class="r">Est. Value</th><th class="r">Completed</th><th class="r">Completed $</th></tr></thead><tbody>
     ${rows.map(r => {
       const z = String(r.zip).padStart(5,'0');
-      return `<tr><td class="zc">${z}</td><td class="cy">${r.city||'—'}</td><td class="pv" title="${r.provider||''}">${r.provider||'—'}</td><td class="r bk">${$n(r.bookings)}</td><td class="r rv">${$f(r.revenue)}</td></tr>`;
+      return `<tr><td class="zc">${z}</td><td class="cy">${r.city||'—'}</td><td class="pv" title="${r.provider||''}">${r.provider||'—'}</td><td class="r bk">${$n(r.bookings)}</td><td class="r rv">${$f(r.revenue)}</td><td class="r bk">${$n(r.fulfilled_bookings||0)}</td><td class="r rv">${$f(r.fulfilled_revenue||0)}</td></tr>`;
     }).join('')}
   </tbody></table>`;
 }
