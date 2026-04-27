@@ -33,6 +33,17 @@ export default async function handler(req, context) {
     const body = await req.json();
     const { mode, companyName, zips, dateFrom, dateTo } = body;
 
+    // ── All providers list (for dropdown) ───────────────────────────────────
+    if (mode === "allProviders") {
+      const rows = await sql(`
+        SELECT DISTINCT name FROM providers
+        WHERE name IS NOT NULL AND name != ''
+        ORDER BY name
+        LIMIT 2000
+      `);
+      return Response.json(rows.map((r) => r.name));
+    }
+
     // ── Provider search autocomplete ─────────────────────────────────────────
     if (mode === "search") {
       const term = sanitizeName((body.term || "").trim());

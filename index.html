@@ -41,15 +41,17 @@ input[type=date]:focus{border-color:#2563eb}
 .go-btn:disabled{background:#374151;color:#6b7280;cursor:not-allowed}
 .zip-hint{font-size:10px;color:#4a6080;margin-top:3px}
 
-/* AUTOCOMPLETE */
-.ac-wrap{position:relative;width:280px}
-.ac-wrap input[type=text]{width:100%}
-.ac-drop{position:absolute;top:100%;left:0;right:0;background:#1a2f56;border:1.5px solid #2563eb;border-top:none;border-radius:0 0 7px 7px;z-index:100;max-height:220px;overflow-y:auto;display:none}
-.ac-drop.open{display:block}
-.ac-item{padding:8px 12px;font-size:12px;color:#c0cde0;cursor:pointer;border-bottom:1px solid #162a52}
-.ac-item:last-child{border-bottom:none}
-.ac-item:hover,.ac-item.sel{background:#2563eb;color:#fff}
-.ac-hint{padding:8px 12px;font-size:11px;color:#4a6080;font-style:italic}
+/* PROVIDER DROPDOWN */
+.pd-wrap{position:relative;width:320px}
+.pd-search{width:100%;background:#162a52;border:1.5px solid #2a4070;border-radius:7px 7px 0 0;color:#e2e8f0;padding:8px 11px;font-size:13px;outline:none}
+.pd-search:focus{border-color:#2563eb}
+.pd-search.solo{border-radius:7px}
+.pd-list{position:absolute;top:100%;left:0;right:0;background:#1a2f56;border:1.5px solid #2563eb;border-top:none;border-radius:0 0 7px 7px;z-index:200;max-height:240px;overflow-y:auto;display:none}
+.pd-list.open{display:block}
+.pd-item{padding:7px 12px;font-size:12px;color:#c0cde0;cursor:pointer;border-bottom:1px solid #162a52}
+.pd-item:last-child{border-bottom:none}
+.pd-item:hover,.pd-item.sel{background:#2563eb;color:#fff}
+.pd-status{padding:8px 12px;font-size:11px;color:#4a6080;font-style:italic}
 
 /* STATE TABS */
 .statetabs{background:#0d1b3e;display:flex;padding:8px 24px 0;gap:3px;border-bottom:2px solid #152340;overflow-x:auto;min-height:40px}
@@ -145,12 +147,12 @@ td{padding:5px 12px;font-size:12px;color:#334155}
       <input type="text" id="company-name-zips" placeholder="e.g. Handyman Connection — Dallas"/>
     </div>
 
-    <!-- Company name — autocomplete for provider mode -->
+    <!-- Company name — searchable dropdown for provider mode -->
     <div class="cf" id="name-field-provider" style="display:none">
-      <label>Parent Company Name</label>
-      <div class="ac-wrap">
-        <input type="text" id="company-name-provider" placeholder="Type to search providers…" autocomplete="off"/>
-        <div class="ac-drop" id="ac-drop"></div>
+      <label>Provider / Company Name</label>
+      <div class="pd-wrap">
+        <input type="text" id="pd-search" class="pd-search solo" placeholder="Loading providers…" autocomplete="off" disabled/>
+        <div class="pd-list" id="pd-list"></div>
       </div>
     </div>
 
@@ -291,77 +293,93 @@ function setMode(mode) {
   document.getElementById('name-field-provider').style.display = mode==='provider' ? '' : 'none';
 }
 
-// ── AUTOCOMPLETE ──────────────────────────────────────────────────────────────
-let acTimer = null;
-let acSelected = -1;
+// ── PROVIDER DROPDOWN ─────────────────────────────────────────────────────────
+let allProviders = [];
+let pdSelected = -1;
+let pdFiltered = [];
 
 function getCompanyName() {
   if (S.mode === 'zips') return document.getElementById('company-name-zips').value.trim();
-  return document.getElementById('company-name-provider').value.trim();
+  return document.getElementById('pd-search').value.trim();
 }
 
-async function acSearch(term) {
-  if (term.length < 2) { acClose(); return; }
-  const drop = document.getElementById('ac-drop');
-  drop.innerHTML = '<div class="ac-hint">Searching…</div>';
-  drop.classList.add('open');
+async function loadAllProviders() {
+  const inp = document.getElementById('pd-search');
+  inp.placeholder = 'Loading providers…';
+  inp.disabled = true;
   try {
     const resp = await fetch('/api/metabase', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: 'search', term }),
+      body: JSON.stringify({ mode: 'allProviders' }),
     });
-    const names = await resp.json();
-    acSelected = -1;
-    if (!names.length) {
-      drop.innerHTML = '<div class="ac-hint">No matches — you can still type any name</div>';
-    } else {
-      drop.innerHTML = names.map((n, i) =>
-        `<div class="ac-item" data-i="${i}" onmousedown="acPick('${n.replace(/'/g,"\\'")}')">
-          ${n}
-        </div>`
-      ).join('');
-    }
+    allProviders = await resp.json();
+    inp.placeholder = `Search ${allProviders.length} providers…`;
+    inp.disabled = false;
+    inp.classList.add('solo');
   } catch {
-    drop.innerHTML = '<div class="ac-hint">Search unavailable</div>';
+    inp.placeholder = 'Type provider name…';
+    inp.disabled = false;
   }
 }
 
-function acPick(name) {
-  document.getElementById('company-name-provider').value = name;
-  acClose();
+function pdRender(term) {
+  const list = document.getElementById('pd-list');
+  if (!term) {
+    pdFiltered = allProviders.slice(0, 80);
+  } else {
+    const t = term.toLowerCase();
+    pdFiltered = allProviders.filter(n => n.toLowerCase().includes(t)).slice(0, 80);
+  }
+  pdSelected = -1;
+  if (!pdFiltered.length) {
+    list.innerHTML = '<div class="pd-status">No matches</div>';
+  } else {
+    list.innerHTML = pdFiltered.map((n, i) =>
+      `<div class="pd-item" data-i="${i}" onmousedown="pdPick(${i})">${n}</div>`
+    ).join('');
+  }
+  list.classList.add('open');
+  document.getElementById('pd-search').classList.remove('solo');
 }
 
-function acClose() {
-  const drop = document.getElementById('ac-drop');
-  if (drop) { drop.classList.remove('open'); drop.innerHTML = ''; }
-  acSelected = -1;
+function pdPick(i) {
+  const name = pdFiltered[i];
+  document.getElementById('pd-search').value = name;
+  pdClose();
+}
+
+function pdClose() {
+  document.getElementById('pd-list').classList.remove('open');
+  document.getElementById('pd-search').classList.add('solo');
+  pdSelected = -1;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  const inp = document.getElementById('company-name-provider');
-  inp.addEventListener('input', function() {
-    clearTimeout(acTimer);
-    acTimer = setTimeout(() => acSearch(this.value.trim()), 280);
-  });
+  loadAllProviders();
+
+  const inp = document.getElementById('pd-search');
+  inp.addEventListener('focus', function() { pdRender(this.value.trim()); });
+  inp.addEventListener('input', function() { pdRender(this.value.trim()); });
   inp.addEventListener('keydown', function(e) {
-    const items = document.querySelectorAll('.ac-item');
+    const items = document.querySelectorAll('.pd-item');
     if (e.key === 'ArrowDown') {
-      acSelected = Math.min(acSelected+1, items.length-1);
-      items.forEach((el,i) => el.classList.toggle('sel', i===acSelected));
+      pdSelected = Math.min(pdSelected+1, items.length-1);
+      items.forEach((el,i) => el.classList.toggle('sel', i===pdSelected));
+      if (items[pdSelected]) items[pdSelected].scrollIntoView({block:'nearest'});
       e.preventDefault();
     } else if (e.key === 'ArrowUp') {
-      acSelected = Math.max(acSelected-1, -1);
-      items.forEach((el,i) => el.classList.toggle('sel', i===acSelected));
+      pdSelected = Math.max(pdSelected-1, -1);
+      items.forEach((el,i) => el.classList.toggle('sel', i===pdSelected));
       e.preventDefault();
-    } else if (e.key === 'Enter' && acSelected >= 0) {
-      acPick(items[acSelected].textContent.trim());
-      e.preventDefault();
+    } else if (e.key === 'Enter') {
+      if (pdSelected >= 0) { pdPick(pdSelected); e.preventDefault(); }
+      else { pdClose(); runQuery(); }
     } else if (e.key === 'Escape') {
-      acClose();
+      pdClose();
     }
   });
-  inp.addEventListener('blur', () => setTimeout(acClose, 150));
+  inp.addEventListener('blur', () => setTimeout(pdClose, 150));
 });
 
 // ── QUERY ─────────────────────────────────────────────────────────────────────
