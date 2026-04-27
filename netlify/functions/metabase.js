@@ -33,6 +33,19 @@ export default async function handler(req, context) {
     const body = await req.json();
     const { mode, companyName, zips, dateFrom, dateTo } = body;
 
+    // ── Provider search autocomplete ─────────────────────────────────────────
+    if (mode === "search") {
+      const term = sanitizeName((body.term || "").trim());
+      if (term.length < 2) return Response.json([]);
+      const rows = await sql(`
+        SELECT DISTINCT name FROM providers
+        WHERE LOWER(name) LIKE LOWER('%${term}%')
+        ORDER BY name
+        LIMIT 25
+      `);
+      return Response.json(rows.map((r) => r.name));
+    }
+
     if (!companyName || companyName.trim().length < 2) {
       return Response.json({ error: "Company name is required (min 2 chars)" }, { status: 400 });
     }

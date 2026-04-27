@@ -41,6 +41,16 @@ input[type=date]:focus{border-color:#2563eb}
 .go-btn:disabled{background:#374151;color:#6b7280;cursor:not-allowed}
 .zip-hint{font-size:10px;color:#4a6080;margin-top:3px}
 
+/* AUTOCOMPLETE */
+.ac-wrap{position:relative;width:280px}
+.ac-wrap input[type=text]{width:100%}
+.ac-drop{position:absolute;top:100%;left:0;right:0;background:#1a2f56;border:1.5px solid #2563eb;border-top:none;border-radius:0 0 7px 7px;z-index:100;max-height:220px;overflow-y:auto;display:none}
+.ac-drop.open{display:block}
+.ac-item{padding:8px 12px;font-size:12px;color:#c0cde0;cursor:pointer;border-bottom:1px solid #162a52}
+.ac-item:last-child{border-bottom:none}
+.ac-item:hover,.ac-item.sel{background:#2563eb;color:#fff}
+.ac-hint{padding:8px 12px;font-size:11px;color:#4a6080;font-style:italic}
+
 /* STATE TABS */
 .statetabs{background:#0d1b3e;display:flex;padding:8px 24px 0;gap:3px;border-bottom:2px solid #152340;overflow-x:auto;min-height:40px}
 .stab{padding:6px 18px;border-radius:6px 6px 0 0;cursor:pointer;font-size:12px;font-weight:700;color:#4a6080;border:1.5px solid transparent;border-bottom:none;transition:all .15s;white-space:nowrap}
@@ -111,16 +121,25 @@ td{padding:5px 12px;font-size:12px;color:#334155}
       <div class="hdr-sub" id="hdr-sub">HouseAccount · Live from Metabase</div>
     </div>
     <div class="mode-toggle">
-      <button class="mbt on" id="mbt-zips" onclick="setMode('zips')">📍 By Zip Codes</button>
       <button class="mbt" id="mbt-provider" onclick="setMode('provider')">🔍 By Provider Name</button>
+      <button class="mbt" id="mbt-zips" onclick="setMode('zips')">📍 By Zip Codes</button>
     </div>
   </div>
 
   <div class="controls" id="controls">
-    <!-- Company name — always shown -->
-    <div class="cf">
-      <label id="name-label">Provider / Company Name</label>
-      <input type="text" id="company-name" placeholder="e.g. Handyman Connection, Ace Handyman…"/>
+    <!-- Company name — plain input for zip mode -->
+    <div class="cf" id="name-field-zips">
+      <label>Provider / Company Name</label>
+      <input type="text" id="company-name-zips" placeholder="e.g. Handyman Connection — Dallas"/>
+    </div>
+
+    <!-- Company name — autocomplete for provider mode -->
+    <div class="cf" id="name-field-provider" style="display:none">
+      <label>Parent Company Name</label>
+      <div class="ac-wrap">
+        <input type="text" id="company-name-provider" placeholder="Type to search providers…" autocomplete="off"/>
+        <div class="ac-drop" id="ac-drop"></div>
+      </div>
     </div>
 
     <!-- Zip textarea — mode=zips only -->
@@ -256,15 +275,86 @@ function setMode(mode) {
   document.getElementById('mbt-zips').classList.toggle('on', mode==='zips');
   document.getElementById('mbt-provider').classList.toggle('on', mode==='provider');
   document.getElementById('zip-field').style.display = mode==='zips' ? '' : 'none';
-  document.getElementById('name-label').textContent =
-    mode === 'zips' ? 'Provider / Company Name' : 'Parent Company Name';
-  document.getElementById('company-name').placeholder =
-    mode === 'zips' ? 'e.g. Handyman Connection — Dallas' : 'e.g. Handyman Connection';
+  document.getElementById('name-field-zips').style.display = mode==='zips' ? '' : 'none';
+  document.getElementById('name-field-provider').style.display = mode==='provider' ? '' : 'none';
 }
+
+// ── AUTOCOMPLETE ──────────────────────────────────────────────────────────────
+let acTimer = null;
+let acSelected = -1;
+
+function getCompanyName() {
+  if (S.mode === 'zips') return document.getElementById('company-name-zips').value.trim();
+  return document.getElementById('company-name-provider').value.trim();
+}
+
+async function acSearch(term) {
+  if (term.length < 2) { acClose(); return; }
+  const drop = document.getElementById('ac-drop');
+  drop.innerHTML = '<div class="ac-hint">Searching…</div>';
+  drop.classList.add('open');
+  try {
+    const resp = await fetch('/api/metabase', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'search', term }),
+    });
+    const names = await resp.json();
+    acSelected = -1;
+    if (!names.length) {
+      drop.innerHTML = '<div class="ac-hint">No matches — you can still type any name</div>';
+    } else {
+      drop.innerHTML = names.map((n, i) =>
+        `<div class="ac-item" data-i="${i}" onmousedown="acPick('${n.replace(/'/g,"\\'")}')">
+          ${n}
+        </div>`
+      ).join('');
+    }
+  } catch {
+    drop.innerHTML = '<div class="ac-hint">Search unavailable</div>';
+  }
+}
+
+function acPick(name) {
+  document.getElementById('company-name-provider').value = name;
+  acClose();
+}
+
+function acClose() {
+  const drop = document.getElementById('ac-drop');
+  if (drop) { drop.classList.remove('open'); drop.innerHTML = ''; }
+  acSelected = -1;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const inp = document.getElementById('company-name-provider');
+  inp.addEventListener('input', function() {
+    clearTimeout(acTimer);
+    acTimer = setTimeout(() => acSearch(this.value.trim()), 280);
+  });
+  inp.addEventListener('keydown', function(e) {
+    const items = document.querySelectorAll('.ac-item');
+    if (e.key === 'ArrowDown') {
+      acSelected = Math.min(acSelected+1, items.length-1);
+      items.forEach((el,i) => el.classList.toggle('sel', i===acSelected));
+      e.preventDefault();
+    } else if (e.key === 'ArrowUp') {
+      acSelected = Math.max(acSelected-1, -1);
+      items.forEach((el,i) => el.classList.toggle('sel', i===acSelected));
+      e.preventDefault();
+    } else if (e.key === 'Enter' && acSelected >= 0) {
+      acPick(items[acSelected].textContent.trim());
+      e.preventDefault();
+    } else if (e.key === 'Escape') {
+      acClose();
+    }
+  });
+  inp.addEventListener('blur', () => setTimeout(acClose, 150));
+});
 
 // ── QUERY ─────────────────────────────────────────────────────────────────────
 async function runQuery() {
-  const companyName = document.getElementById('company-name').value.trim();
+  const companyName = getCompanyName();
   const dateFrom    = document.getElementById('d-from').value;
   const dateTo      = document.getElementById('d-to').value;
 
@@ -441,7 +531,7 @@ document.getElementById('zip-input').addEventListener('input', function() {
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 setPeriod(12);
-setMode('zips');
+setMode('provider');
 </script>
 </body>
 </html>
