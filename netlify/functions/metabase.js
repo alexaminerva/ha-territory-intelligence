@@ -156,7 +156,9 @@ export default async function handler(req, context) {
       ORDER BY revenue DESC
     `);
 
-    // ── Signed query ──────────────────────────────────────────────────────────
+    // ── Signed query — finds ALL matching providers, not limited to user's zips ──
+    // This ensures all signed locations in a state are visible, not just those
+    // that happen to overlap the specific zips the user entered.
     const signedRows = await sql(`
       SELECT p.name AS provider, z.code AS zip, z.city,
              COUNT(b.id) AS bookings,
@@ -166,15 +168,18 @@ export default async function handler(req, context) {
       FROM bookings b
       JOIN providers p ON p.id = b.provider_id
       JOIN zips z ON z.id = b.zip_id
-      WHERE z.code IN (${zipSQL})
-        AND b.created_at BETWEEN '${dateFrom}' AND '${dateTo}'
+      WHERE b.created_at BETWEEN '${dateFrom}' AND '${dateTo}'
         AND LOWER(p.name) LIKE LOWER('%${fn}%')
         ${verticalFilter}
       GROUP BY p.name, z.code, z.city
       ORDER BY revenue DESC
     `);
 
-    return Response.json({ market: marketRows, signed: signedRows, zips: zipSet });
+    // Include signed zips in the returned zip list so state tabs work for them too
+    const signedZips = signedRows.map((r) => String(r.zip).padStart(5, "0"));
+    const allZips = [...new Set([...zipSet, ...signedZips])];
+
+    return Response.json({ market: marketRows, signed: signedRows, zips: allZips });
   } catch (err) {
     console.error(err);
     return Response.json({ error: err.message }, { status: 500 });
