@@ -114,13 +114,14 @@ export default async function handler(req, context) {
         return Response.json({ error: "No valid 5-digit zip codes found" }, { status: 400 });
       }
     } else {
+      // Use all-time bookings for territory discovery so inactive-in-period
+      // providers still contribute their zip coverage to the market query.
       const zipRows = await sql(`
         SELECT DISTINCT z.code AS zip
         FROM bookings b
         JOIN providers p ON p.id = b.provider_id
         JOIN zips z ON z.id = b.zip_id
         WHERE LOWER(p.name) LIKE LOWER('%${fn}%')
-          AND b.created_at BETWEEN '${dateFrom}' AND '${dateTo}'
           ${verticalFilter}
         ORDER BY z.code
         LIMIT 1000
@@ -130,7 +131,7 @@ export default async function handler(req, context) {
       if (zipSet.length === 0) {
         return Response.json({
           market: [], signed: [], zips: [],
-          message: `No bookings found for providers matching "${companyName}"${vn ? ` in vertical "${vn}"` : ""} in this date range.`,
+          message: `No bookings found for providers matching "${companyName}"${vn ? ` in vertical "${vn}"` : ""}.`,
         });
       }
     }
@@ -156,20 +157,20 @@ export default async function handler(req, context) {
       ORDER BY revenue DESC
     `);
 
-    // ── Signed query — finds ALL matching providers, not limited to user's zips ──
-    // This ensures all signed locations in a state are visible, not just those
-    // that happen to overlap the specific zips the user entered.
+    // ── Signed query — all-time provider presence, date-range metrics ────────────
+    // Join against all historical bookings so providers who are signed but had
+    // zero activity in the selected period still appear (with 0 metrics).
+    // CASE WHEN scopes the aggregated metrics to the requested date range.
     const signedRows = await sql(`
       SELECT p.name AS provider, z.code AS zip, z.city,
-             COUNT(b.id) AS bookings,
-             COALESCE(SUM((lower(b.estimate)+upper(b.estimate))/2.0), 0) AS revenue,
-             COUNT(CASE WHEN b.status::text = 'fulfilled' THEN 1 END) AS fulfilled_bookings,
-             COALESCE(SUM(CASE WHEN b.status::text = 'fulfilled' THEN (lower(b.estimate)+upper(b.estimate))/2.0 ELSE 0 END), 0) AS fulfilled_revenue
+             COUNT(CASE WHEN b.created_at BETWEEN '${dateFrom}' AND '${dateTo}' THEN 1 END) AS bookings,
+             COALESCE(SUM(CASE WHEN b.created_at BETWEEN '${dateFrom}' AND '${dateTo}' THEN (lower(b.estimate)+upper(b.estimate))/2.0 ELSE 0 END), 0) AS revenue,
+             COUNT(CASE WHEN b.created_at BETWEEN '${dateFrom}' AND '${dateTo}' AND b.status::text = 'fulfilled' THEN 1 END) AS fulfilled_bookings,
+             COALESCE(SUM(CASE WHEN b.created_at BETWEEN '${dateFrom}' AND '${dateTo}' AND b.status::text = 'fulfilled' THEN (lower(b.estimate)+upper(b.estimate))/2.0 ELSE 0 END), 0) AS fulfilled_revenue
       FROM bookings b
       JOIN providers p ON p.id = b.provider_id
       JOIN zips z ON z.id = b.zip_id
-      WHERE b.created_at BETWEEN '${dateFrom}' AND '${dateTo}'
-        AND LOWER(p.name) LIKE LOWER('%${fn}%')
+      WHERE LOWER(p.name) LIKE LOWER('%${fn}%')
         ${verticalFilter}
       GROUP BY p.name, z.code, z.city
       ORDER BY revenue DESC
