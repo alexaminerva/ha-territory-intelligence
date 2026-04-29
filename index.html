@@ -652,11 +652,34 @@ function marketTable(rows) {
 
 function signedTable(rows) {
   if (!rows.length) return `<div class="emp"><div class="ei">🤝</div><strong>No signed providers found</strong><p>No providers matching "${S.results?.companyName}" found on HouseAccount.</p></div>`;
-  return `<table><thead><tr><th>Provider</th><th>ZIP</th><th>City</th><th class="r">Booked</th><th class="r">Est. Value</th><th class="r">Completed</th><th class="r">Completed $</th></tr></thead><tbody>
-    ${rows.map(r => {
-      const z = r.zip ? String(r.zip).padStart(5,'0') : null;
-      const zipCell = z ? `<td class="zc">${z}</td>` : `<td style="color:#94a3b8;font-style:italic;font-size:11px">no bookings</td>`;
-      return `<tr><td class="pv" title="${r.provider||''}">${r.provider||'—'}</td>${zipCell}<td class="cy">${r.city||'—'}</td><td class="r bk">${$n(r.bookings)}</td><td class="r rv">${$f(r.revenue)}</td><td class="r bk">${$n(r.fulfilled_bookings||0)}</td><td class="r rv">${$f(r.fulfilled_revenue||0)}</td></tr>`;
+
+  // Aggregate rows by provider name — each provider gets one summary row
+  const byProvider = {};
+  rows.forEach(r => {
+    if (!byProvider[r.provider]) {
+      byProvider[r.provider] = { provider: r.provider, bookings: 0, revenue: 0, fulfilled_bookings: 0, fulfilled_revenue: 0, zips: 0 };
+    }
+    const p = byProvider[r.provider];
+    p.bookings          += (+r.bookings||0);
+    p.revenue           += (+r.revenue||0);
+    p.fulfilled_bookings += (+r.fulfilled_bookings||0);
+    p.fulfilled_revenue  += (+r.fulfilled_revenue||0);
+    if (r.zip) p.zips++;
+  });
+
+  const providers = Object.values(byProvider).sort((a,b) => b.revenue - a.revenue);
+
+  return `<table><thead><tr><th>Provider</th><th class="r">Zips Active</th><th class="r">Booked</th><th class="r">Est. Value</th><th class="r">Completed</th><th class="r">Completed $</th></tr></thead><tbody>
+    ${providers.map(p => {
+      const noActivity = p.bookings === 0;
+      return `<tr>
+        <td class="pv" title="${p.provider}">${p.provider}</td>
+        <td class="r bk" style="color:#94a3b8">${p.zips > 0 ? p.zips : '<span style="font-style:italic;font-size:10px">no bookings yet</span>'}</td>
+        <td class="r bk" style="${noActivity?'color:#94a3b8':''}">${$n(p.bookings)}</td>
+        <td class="r rv" style="${noActivity?'color:#94a3b8':''}">${noActivity ? '—' : $f(p.revenue)}</td>
+        <td class="r bk" style="${noActivity?'color:#94a3b8':''}">${$n(p.fulfilled_bookings)}</td>
+        <td class="r rv" style="${noActivity?'color:#94a3b8':''}">${noActivity ? '—' : $f(p.fulfilled_revenue)}</td>
+      </tr>`;
     }).join('')}
   </tbody></table>`;
 }
