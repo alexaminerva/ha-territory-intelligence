@@ -491,14 +491,17 @@ function renderResults() {
   if (!S.results) return;
   const { market, signed, companyName, dateFrom, dateTo } = S.results;
 
-  // Filter by state
-  function filterState(rows) {
+  // Filter by state — null-zip rows (no bookings) only show in ALL view
+  function filterState(rows, isSigned) {
     if (S.state === 'ALL') return rows;
-    return rows.filter(r => S.stateMap[String(r.zip).padStart(5,'0')] === S.state);
+    return rows.filter(r => {
+      if (!r.zip && isSigned) return false; // no location data, hide in state tabs
+      return S.stateMap[String(r.zip).padStart(5,'0')] === S.state;
+    });
   }
 
-  const mRows = filterState(market).sort((a,b) => b.revenue - a.revenue);
-  const sRows = filterState(signed).sort((a,b) => b.revenue - a.revenue);
+  const mRows = filterState(market, false).sort((a,b) => b.revenue - a.revenue);
+  const sRows = filterState(signed, true).sort((a,b) => b.revenue - a.revenue);
 
   const mRev  = mRows.reduce((a,r) => a + (+r.revenue||0), 0);
   const mBk   = mRows.reduce((a,r) => a + (+r.bookings||0), 0);
@@ -590,9 +593,15 @@ function renderResults() {
 }
 
 function signedStatesSummary(allSigned) {
-  // Group signed rows by state
   const byState = {};
+  const noLocation = new Set();
+
   allSigned.forEach(r => {
+    if (!r.zip) {
+      // Provider exists in system but has no bookings — no geographic data
+      if (r.provider) noLocation.add(r.provider);
+      return;
+    }
     const z = String(r.zip).padStart(5,'0');
     const st = S.stateMap[z];
     if (!st) return;
@@ -603,12 +612,7 @@ function signedStatesSummary(allSigned) {
   });
 
   const states = Object.entries(byState).sort((a,b) => b[1].revenue - a[1].revenue);
-  if (!states.length) {
-    return `<div class="state-summary">
-      <div class="ss-title">🤝 Signed Providers by State</div>
-      <div class="ss-none">No signed providers found in any state for this date range.</div>
-    </div>`;
-  }
+  const totalSigned = new Set(allSigned.map(r => r.provider).filter(Boolean)).size;
 
   const chips = states.map(([st, d]) => {
     const label = STATE_LABELS[st] || st;
@@ -622,9 +626,16 @@ function signedStatesSummary(allSigned) {
     </div>`;
   }).join('');
 
+  const noLocHtml = noLocation.size ? `
+    <div style="margin-top:10px;padding:8px 12px;background:#fefce8;border:1px solid #fde68a;border-radius:8px;font-size:11px;color:#92400e;">
+      <strong>${noLocation.size} signed provider${noLocation.size!==1?'s':''} with no booking history yet:</strong>
+      ${[...noLocation].join(', ')}
+    </div>` : '';
+
   return `<div class="state-summary">
-    <div class="ss-title">🤝 Signed Providers by State — click any state to drill in</div>
-    <div class="ss-grid">${chips}</div>
+    <div class="ss-title">🤝 ${totalSigned} Signed Provider${totalSigned!==1?'s':''} — click a state to drill in</div>
+    <div class="ss-grid">${chips || '<div class="ss-none">No providers with booking activity found.</div>'}</div>
+    ${noLocHtml}
   </div>`;
 }
 
@@ -640,11 +651,12 @@ function marketTable(rows) {
 }
 
 function signedTable(rows) {
-  if (!rows.length) return `<div class="emp"><div class="ei">🤝</div><strong>No signed locations found</strong><p>No providers matching "${S.results?.companyName}" found on HouseAccount in these zips.</p></div>`;
-  return `<table><thead><tr><th>ZIP</th><th>City</th><th>Provider</th><th class="r">Booked</th><th class="r">Est. Value</th><th class="r">Completed</th><th class="r">Completed $</th></tr></thead><tbody>
+  if (!rows.length) return `<div class="emp"><div class="ei">🤝</div><strong>No signed providers found</strong><p>No providers matching "${S.results?.companyName}" found on HouseAccount.</p></div>`;
+  return `<table><thead><tr><th>Provider</th><th>ZIP</th><th>City</th><th class="r">Booked</th><th class="r">Est. Value</th><th class="r">Completed</th><th class="r">Completed $</th></tr></thead><tbody>
     ${rows.map(r => {
-      const z = String(r.zip).padStart(5,'0');
-      return `<tr><td class="zc">${z}</td><td class="cy">${r.city||'—'}</td><td class="pv" title="${r.provider||''}">${r.provider||'—'}</td><td class="r bk">${$n(r.bookings)}</td><td class="r rv">${$f(r.revenue)}</td><td class="r bk">${$n(r.fulfilled_bookings||0)}</td><td class="r rv">${$f(r.fulfilled_revenue||0)}</td></tr>`;
+      const z = r.zip ? String(r.zip).padStart(5,'0') : null;
+      const zipCell = z ? `<td class="zc">${z}</td>` : `<td style="color:#94a3b8;font-style:italic;font-size:11px">no bookings</td>`;
+      return `<tr><td class="pv" title="${r.provider||''}">${r.provider||'—'}</td>${zipCell}<td class="cy">${r.city||'—'}</td><td class="r bk">${$n(r.bookings)}</td><td class="r rv">${$f(r.revenue)}</td><td class="r bk">${$n(r.fulfilled_bookings||0)}</td><td class="r rv">${$f(r.fulfilled_revenue||0)}</td></tr>`;
     }).join('')}
   </tbody></table>`;
 }

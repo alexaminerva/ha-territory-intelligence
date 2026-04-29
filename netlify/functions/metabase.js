@@ -157,27 +157,30 @@ export default async function handler(req, context) {
       ORDER BY revenue DESC
     `);
 
-    // ── Signed query — all-time provider presence, date-range metrics ────────────
-    // Join against all historical bookings so providers who are signed but had
-    // zero activity in the selected period still appear (with 0 metrics).
-    // CASE WHEN scopes the aggregated metrics to the requested date range.
+    // ── Signed query — starts from providers table so zero-booking providers appear
+    // LEFT JOIN to bookings means providers with no bookings still get a row (zip=null).
+    // CASE WHEN scopes the aggregated metrics to the selected date range.
     const signedRows = await sql(`
-      SELECT p.name AS provider, z.code AS zip, z.city,
-             COUNT(CASE WHEN b.created_at BETWEEN '${dateFrom}' AND '${dateTo}' THEN 1 END) AS bookings,
+      SELECT p.name AS provider,
+             p.id AS provider_id,
+             z.code AS zip,
+             z.city,
+             COUNT(CASE WHEN b.created_at BETWEEN '${dateFrom}' AND '${dateTo}' THEN b.id END) AS bookings,
              COALESCE(SUM(CASE WHEN b.created_at BETWEEN '${dateFrom}' AND '${dateTo}' THEN (lower(b.estimate)+upper(b.estimate))/2.0 ELSE 0 END), 0) AS revenue,
-             COUNT(CASE WHEN b.created_at BETWEEN '${dateFrom}' AND '${dateTo}' AND b.status::text = 'fulfilled' THEN 1 END) AS fulfilled_bookings,
+             COUNT(CASE WHEN b.created_at BETWEEN '${dateFrom}' AND '${dateTo}' AND b.status::text = 'fulfilled' THEN b.id END) AS fulfilled_bookings,
              COALESCE(SUM(CASE WHEN b.created_at BETWEEN '${dateFrom}' AND '${dateTo}' AND b.status::text = 'fulfilled' THEN (lower(b.estimate)+upper(b.estimate))/2.0 ELSE 0 END), 0) AS fulfilled_revenue
-      FROM bookings b
-      JOIN providers p ON p.id = b.provider_id
-      JOIN zips z ON z.id = b.zip_id
+      FROM providers p
+      LEFT JOIN bookings b ON b.provider_id = p.id
+      LEFT JOIN zips z ON z.id = b.zip_id
       WHERE LOWER(p.name) LIKE LOWER('%${fn}%')
-        ${verticalFilter}
-      GROUP BY p.name, z.code, z.city
+      GROUP BY p.name, p.id, z.code, z.city
       ORDER BY revenue DESC
     `);
 
-    // Include signed zips in the returned zip list so state tabs work for them too
-    const signedZips = signedRows.map((r) => String(r.zip).padStart(5, "0"));
+    // Include signed provider zips in returned zip list so state tabs show them
+    const signedZips = signedRows
+      .filter((r) => r.zip)
+      .map((r) => String(r.zip).padStart(5, "0"));
     const allZips = [...new Set([...zipSet, ...signedZips])];
 
     return Response.json({ market: marketRows, signed: signedRows, zips: allZips });
