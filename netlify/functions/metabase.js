@@ -173,6 +173,7 @@ export default async function handler(req, context) {
       LEFT JOIN bookings b ON b.provider_id = p.id
       LEFT JOIN zips z ON z.id = b.zip_id
       WHERE LOWER(p.name) LIKE LOWER('%${fn}%')
+        AND p.signed = true
       GROUP BY p.name, p.id, z.code, z.city
       ORDER BY revenue DESC
     `);
