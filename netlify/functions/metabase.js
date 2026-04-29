@@ -163,9 +163,10 @@ export default async function handler(req, context) {
       ORDER BY revenue DESC
     `);
 
-    // ── Signed query — starts from providers table so zero-booking providers appear
-    // LEFT JOIN to bookings means providers with no bookings still get a row (zip=null).
-    // CASE WHEN scopes the aggregated metrics to the selected date range.
+    // ── Signed query — all signed providers by name, full activity, no zip filter
+    // Market query is scoped to the user's zip set (opportunity in their territory).
+    // Signed query is independent — shows every signed provider matching the name
+    // with all their bookings in the date range, regardless of what zips were entered.
     const signedRows = await sql(`
       SELECT p.name AS provider,
              p.id AS provider_id,
@@ -184,7 +185,7 @@ export default async function handler(req, context) {
       ORDER BY revenue DESC
     `);
 
-    // Include signed provider zips in returned zip list so state tabs show them
+    // Merge signed provider zips into the zip list so their states get tabs
     const signedZips = signedRows
       .filter((r) => r.zip)
       .map((r) => String(r.zip).padStart(5, "0"));
