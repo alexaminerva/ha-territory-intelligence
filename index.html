@@ -491,23 +491,15 @@ function renderResults() {
   if (!S.results) return;
   const { market, signed, companyName, dateFrom, dateTo } = S.results;
 
-  // Market rows are scoped by state tab (they represent the entered territory)
-  function filterMarketState(rows) {
+  // Both market and signed filter by selected state tab.
+  // All States tab shows everything.
+  function filterByState(rows) {
     if (S.state === 'ALL') return rows;
-    return rows.filter(r => S.stateMap[String(r.zip).padStart(5,'0')] === S.state);
+    return rows.filter(r => r.zip && S.stateMap[String(r.zip).padStart(5,'0')] === S.state);
   }
 
-  // Signed rows are filtered by state tab but always show all signed providers
-  function filterSignedState(rows) {
-    if (S.state === 'ALL') return rows;
-    return rows.filter(r => {
-      if (!r.zip) return true; // no-booking providers always visible
-      return S.stateMap[String(r.zip).padStart(5,'0')] === S.state;
-    });
-  }
-
-  const mRows = filterMarketState(market).sort((a,b) => b.revenue - a.revenue);
-  const sRows = filterSignedState(signed).sort((a,b) => b.revenue - a.revenue);
+  const mRows = filterByState(market).sort((a,b) => b.revenue - a.revenue);
+  const sRows = filterByState(signed).sort((a,b) => b.revenue - a.revenue);
 
   const mRev  = mRows.reduce((a,r) => a + (+r.revenue||0), 0);
   const mBk   = mRows.reduce((a,r) => a + (+r.bookings||0), 0);
