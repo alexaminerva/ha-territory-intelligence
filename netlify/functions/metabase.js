@@ -79,7 +79,7 @@ export default async function handler(req, context) {
       if (term.length < 2) return Response.json([]);
       const rows = await sql(`
         SELECT DISTINCT name FROM providers
-        WHERE LOWER(name) ~* ('\m' || LOWER('${term}'))
+        WHERE LOWER(name) LIKE LOWER('%${term}%')
         ORDER BY name
         LIMIT 25
       `);
@@ -96,11 +96,8 @@ export default async function handler(req, context) {
     const fn = sanitizeName(companyName.trim());
     const vn = vertical ? sanitizeName(vertical.trim()) : null;
 
-    // Word-boundary name match: "ace handyman" must start at a word boundary
-    // so "Grace Handyman" doesn't match "ace handyman".
-    // PostgreSQL regex \m = start of word.
-    const nameMatch = `LOWER(name) ~* '\\m${fn.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'`;
-    const nameMatchB = `LOWER(p.name) ~* '\\m${fn.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'`;
+    const nameMatch  = `LOWER(name) LIKE LOWER('%${fn}%')`;
+    const nameMatchB = `LOWER(p.name) LIKE LOWER('%${fn}%')`;
 
     // Optional vertical filter — limits to providers who have this trade
     const verticalFilter = vn
