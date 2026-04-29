@@ -79,7 +79,7 @@ export default async function handler(req, context) {
       if (term.length < 2) return Response.json([]);
       const rows = await sql(`
         SELECT DISTINCT name FROM providers
-        WHERE LOWER(name) LIKE LOWER('%${term}%')
+        WHERE LOWER(name) ~* ('\m' || LOWER('${term}'))
         ORDER BY name
         LIMIT 25
       `);
@@ -95,6 +95,12 @@ export default async function handler(req, context) {
 
     const fn = sanitizeName(companyName.trim());
     const vn = vertical ? sanitizeName(vertical.trim()) : null;
+
+    // Word-boundary name match: "ace handyman" must start at a word boundary
+    // so "Grace Handyman" doesn't match "ace handyman".
+    // PostgreSQL regex \m = start of word.
+    const nameMatch = `LOWER(name) ~* '\\m${fn.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'`;
+    const nameMatchB = `LOWER(p.name) ~* '\\m${fn.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'`;
 
     // Optional vertical filter — limits to providers who have this trade
     const verticalFilter = vn
@@ -121,7 +127,7 @@ export default async function handler(req, context) {
         FROM bookings b
         JOIN providers p ON p.id = b.provider_id
         JOIN zips z ON z.id = b.zip_id
-        WHERE LOWER(p.name) LIKE LOWER('%${fn}%')
+        WHERE ${nameMatchB}
           ${verticalFilter}
         ORDER BY z.code
         LIMIT 1000
@@ -150,7 +156,7 @@ export default async function handler(req, context) {
       WHERE z.code IN (${zipSQL})
         AND b.created_at BETWEEN '${dateFrom}' AND '${dateTo}'
         AND b.provider_id NOT IN (
-          SELECT id FROM providers WHERE LOWER(name) LIKE LOWER('%${fn}%')
+          SELECT id FROM providers WHERE ${nameMatch}
         )
         ${verticalFilter}
       GROUP BY z.code, z.city
@@ -172,7 +178,7 @@ export default async function handler(req, context) {
       FROM providers p
       LEFT JOIN bookings b ON b.provider_id = p.id
       LEFT JOIN zips z ON z.id = b.zip_id
-      WHERE LOWER(p.name) LIKE LOWER('%${fn}%')
+      WHERE ${nameMatchB}
         AND p.signed = true
       GROUP BY p.name, p.id, z.code, z.city
       ORDER BY revenue DESC
