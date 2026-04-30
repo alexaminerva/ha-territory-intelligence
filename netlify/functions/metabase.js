@@ -99,11 +99,11 @@ export default async function handler(req, context) {
     const nameMatch  = `LOWER(name) LIKE LOWER('%${fn}%')`;
     const nameMatchB = `LOWER(p.name) LIKE LOWER('%${fn}%')`;
 
-    // Optional vertical filter — limits to providers who have this trade
+    // Filter bookings by vertical via bookings → suggestions → verticals
     const verticalFilter = vn
-      ? `AND b.provider_id IN (
-           SELECT t.provider_id FROM trades t
-           JOIN verticals v ON v.id = t.vertical_id
+      ? `AND b.suggestion_id IN (
+           SELECT sg.id FROM suggestions sg
+           JOIN verticals v ON v.id = sg.vertical_id
            WHERE LOWER(v.name) = LOWER('${vn}')
          )`
       : "";
